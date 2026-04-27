@@ -1,0 +1,32 @@
+{
+    "name": "go&react-devc",
+    "image": "mcr.microsoft.com/devcontainers/go:latest",
+    "features": {
+        "ghcr.io/devcontainers/features/node:1": {
+            "version": "lts",
+            "pnpmVersion": "latest",
+            "yarnVersion": "latest"
+        }
+    },
+    "forwardPorts": [5173, 8080],
+    "customizations": {
+        "vscode": {
+            "settings": {
+                "[go]": {
+                    "editor.formatOnSave": true,
+                },
+                "[javascriptreact]": {
+                    "editor.defaultFormatter": "esbenp.prettier-vscode"
+                },
+                "[typescriptreact]": {
+                    "editor.defaultFormatter": "esbenp.prettier-vscode"
+                },
+            },
+            "extensions": [
+                "dbaeumer.vscode-eslint",
+                "esbenp.prettier-vscode",
+                "bradlc.vscode-tailwindcss"
+            ]
+        }
+    }
+}
