@@ -6,12 +6,15 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"time"
 
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
 )
 
 var jwtSecretKey = []byte("my_super_super_secret_key_12345")
+
+const inviteCodeLength = 8
 
 var db *gorm.DB
 
@@ -48,12 +51,25 @@ type Server struct {
 
 	Users    []User `gorm:"many2many:user_servers;"`
 	Channels []Channel
+	Invites  []Invite
 }
 
 type Channel struct {
 	gorm.Model
 	ServerID uint   `gorm:"not null"`
 	Name     string `gorm:"not null"`
+}
+
+type Invite struct {
+	Code string `gorm:"primaryKey;type:varchar(20)"`
+
+	Uses      uint `gorm:"default=0"`
+	MaxUses   uint `gorm:"default=0"`
+	ServerID  uint `gorm:"not null"`
+	CreatorID uint `gorm:"not null"`
+
+	CreatedAt time.Time
+	ExpiresAt *time.Time
 }
 
 func main() {
@@ -103,6 +119,8 @@ func main() {
 	http.HandleFunc("/api/create_channel", authMiddle(createChannelHandler))
 	http.HandleFunc("/api/modify_channel", authMiddle(modifyChannelHandler))
 	http.HandleFunc("/api/delete_channel", authMiddle(deleteChannelHandler))
+	http.HandleFunc("/api/create_invite", authMiddle(createInviteHandler))
+	http.HandleFunc("/api/delete_invite", authMiddle(deleteInviteHandler))
 
 	log.Printf("Server has started on http://127.0.0.1:%d\n", settings.Http.Port)
 	http.ListenAndServe(fmt.Sprintf(":%d", settings.Http.Port), nil)

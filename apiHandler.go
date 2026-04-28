@@ -376,7 +376,7 @@ func modifyServerHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var server Server
-	if err := db.Where("id = ?", req.ServerID).First(&server).Error; err != nil {
+	if err := db.Preload("Users").Where("id = ?", req.ServerID).First(&server).Error; err != nil {
 		w.WriteHeader(http.StatusNotFound)
 		json.NewEncoder(w).Encode(map[string]string{"error": "サーバーが存在しません"})
 		return
@@ -389,18 +389,87 @@ func modifyServerHandler(w http.ResponseWriter, r *http.Request) {
 		json.NewEncoder(w).Encode(map[string]string{"error": "サーバーに参加していないユーザーは操作できません"})
 		return
 	}
-	//HERE
-	//
-	//
-	//
-	//
-	//
-	//
+	if server.Name == "" {
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(map[string]string{"error": "サーバー名は必須です"})
+		return
+	}
+	server.Name = req.Name
+
+	if req.IconURL == "" {
+		server.IconURL = "default-icon.png"
+	} else {
+		server.IconURL = req.IconURL
+	}
+
+	if err := db.Save(&server).Error; err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		json.NewEncoder(w).Encode(map[string]string{"error": "DBの更新に失敗しました"})
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(map[string]string{
+		"message": "サーバー情報変更成功",
+		"status":  "success",
+	})
 }
 
-type DeleteServerRequest struct{}
+type DeleteServerRequest struct {
+	ServerID uint
+	Name     string
+}
 
-func deleteServerHandler(w http.ResponseWriter, r *http.Request) {}
+func deleteServerHandler(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+
+	var req DeleteServerRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(map[string]string{"error": "不正なデータ形式です"})
+		return
+	}
+
+	var user User
+	if err := db.Where("id = ?", r.Context().Value("user_id")).First(&user).Error; err != nil {
+		w.WriteHeader(http.StatusNotFound)
+		json.NewEncoder(w).Encode(map[string]string{"error": "ユーザーが存在しません"})
+		return
+	}
+
+	var server Server
+	if err := db.Preload("Users").Where("id = ?", req.ServerID).First(&server).Error; err != nil {
+		w.WriteHeader(http.StatusNotFound)
+		json.NewEncoder(w).Encode(map[string]string{"error": "サーバーが存在しません"})
+		return
+	}
+
+	if !slices.ContainsFunc(server.Users, func(u User) bool {
+		return u.ID == user.ID
+	}) {
+		w.WriteHeader(http.StatusForbidden)
+		json.NewEncoder(w).Encode(map[string]string{"error": "サーバーに参加していないユーザーは操作できません"})
+		return
+	}
+
+	if server.Name != req.Name {
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(map[string]string{"error": "サーバー名が間違っています"})
+		return
+	}
+
+	if err := db.Delete(&server).Error; err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		json.NewEncoder(w).Encode(map[string]string{"error": "DBの更新に失敗しました"})
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(map[string]string{
+		"message": "サーバー削除成功",
+		"status":  "success",
+	})
+}
 
 type JoinServerRequest struct{}
 
@@ -412,7 +481,18 @@ func leaveServerHandler(w http.ResponseWriter, r *http.Request) {}
 
 type ListServerCurrentlyOnRequest struct{}
 
-func listServerCurrentlyOnHandler(w http.ResponseWriter, r *http.Request) {}
+func listServerCurrentlyOnHandler(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	var user User
+	if err := db.Where("id = ?", r.Context().Value("user_id")).First(&user).Error; err != nil {
+		w.WriteHeader(http.StatusNotFound)
+		json.NewEncoder(w).Encode(map[string]string{"error": "存在しないユーザーからのリクエストです"})
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(map[string][]Server{"channels": user.Servers})
+}
 
 type CreateChannelRequest struct{}
 
@@ -425,3 +505,119 @@ func modifyChannelHandler(w http.ResponseWriter, r *http.Request) {}
 type DeleteChannelRequest struct{}
 
 func deleteChannelHandler(w http.ResponseWriter, r *http.Request) {}
+
+type CreateInviteRequest struct {
+	Duration string
+	MaxUses  uint
+	ServerID uint
+}
+
+func createInviteHandler(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+
+	var req CreateInviteRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(map[string]string{"error": "不正なデータ形式です"})
+		return
+	}
+
+	var user User
+	if err := db.Where("id = ?", r.Context().Value("user_id")).First(&user).Error; err != nil {
+		w.WriteHeader(http.StatusNotFound)
+		json.NewEncoder(w).Encode(map[string]string{"error": "ユーザーが存在しません"})
+		return
+	}
+
+	var server Server
+	if err := db.Preload("Users").Where("id = ?", req.ServerID).First(&server).Error; err != nil {
+		w.WriteHeader(http.StatusNotFound)
+		json.NewEncoder(w).Encode(map[string]string{"error": "サーバーが存在しません"})
+		return
+	}
+	if !slices.ContainsFunc(server.Users, func(u User) bool {
+		return u.ID == user.ID
+	}) {
+		w.WriteHeader(http.StatusForbidden)
+		json.NewEncoder(w).Encode(map[string]string{"error": "サーバーに参加していないユーザーは操作できません"})
+		return
+	}
+
+	now := time.Now()
+	var expires time.Time
+	if req.Duration != "" {
+		duration, err := time.ParseDuration(req.Duration)
+		if err != nil {
+			duration = 24 * time.Hour
+		}
+		expires = now.Add(duration)
+	} else {
+		expires = now.Add(time.Hour)
+	}
+
+	code, err := generateInviteCode(inviteCodeLength)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		json.NewEncoder(w).Encode(map[string]string{"error": "招待コード生成に失敗しました"})
+		return
+	}
+	newInvite := Invite{
+		Code:      code,
+		MaxUses:   req.MaxUses,
+		ServerID:  req.ServerID,
+		CreatorID: user.ID,
+		CreatedAt: now,
+		ExpiresAt: &expires,
+	}
+	if err := db.Create(&newInvite).Error; err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		json.NewEncoder(w).Encode(map[string]string{"error": "DBの更新に失敗しました"})
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(map[string]string{
+		"message":    "招待コード生成成功",
+		"invitecode": code,
+	})
+}
+
+type DeleteInviteRequest struct {
+	InviteCode string
+}
+
+func deleteInviteHandler(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+
+	var req DeleteInviteRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(map[string]string{"error": "不正なデータ形式です"})
+		return
+	}
+
+	var user User
+	if err := db.Where("id = ?", r.Context().Value("user_id")).First(&user).Error; err != nil {
+		w.WriteHeader(http.StatusNotFound)
+		json.NewEncoder(w).Encode(map[string]string{"error": "ユーザーが存在しません"})
+		return
+	}
+
+	var invite Invite
+	if err := db.Where("code = ?", req.InviteCode).First(&invite).Error; err != nil {
+		w.WriteHeader(http.StatusNotFound)
+		json.NewEncoder(w).Encode(map[string]string{"error": "招待コードが存在しません"})
+		return
+	}
+
+	if invite.CreatorID != user.ID {
+		w.WriteHeader(http.StatusForbidden)
+		json.NewEncoder(w).Encode(map[string]string{"error": "作成者のみが招待コードを削除できます"})
+		return
+	}
+
+	if err := db.Delete(&invite).Error; err != nil {
+
+	}
+
+}
