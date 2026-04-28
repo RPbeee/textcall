@@ -484,14 +484,14 @@ type ListServerCurrentlyOnRequest struct{}
 func listServerCurrentlyOnHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	var user User
-	if err := db.Where("id = ?", r.Context().Value("user_id")).First(&user).Error; err != nil {
+	if err := db.Preload("Servers").Where("id = ?", r.Context().Value("user_id")).First(&user).Error; err != nil {
 		w.WriteHeader(http.StatusNotFound)
 		json.NewEncoder(w).Encode(map[string]string{"error": "存在しないユーザーからのリクエストです"})
 		return
 	}
 
 	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(map[string][]Server{"channels": user.Servers})
+	json.NewEncoder(w).Encode(map[string][]Server{"servers": user.Servers})
 }
 
 type CreateChannelRequest struct{}
@@ -617,7 +617,29 @@ func deleteInviteHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := db.Delete(&invite).Error; err != nil {
-
+		w.WriteHeader(http.StatusInternalServerError)
+		json.NewEncoder(w).Encode(map[string]string{"error": "DBの更新に失敗しました"})
+		return
 	}
 
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(map[string]string{
+		"message": "招待コード削除成功",
+		"status":  "success",
+	})
+
+}
+
+func listMyInviteHandler(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+
+	var user User
+	if err := db.Preload("Invites").Where("id = ?", r.Context().Value("user_id")).First(&user).Error; err != nil {
+		w.WriteHeader(http.StatusNotFound)
+		json.NewEncoder(w).Encode(map[string]string{"error": "存在しないユーザーからのリクエストです"})
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(map[string][]Invite{"invites": user.Invites})
 }

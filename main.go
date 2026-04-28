@@ -42,6 +42,7 @@ type User struct {
 	StatusMessage string
 
 	Servers []Server `gorm:"many2many:user_servers;"`
+	Invites []Invite `gorm:"foreignKey:CreatorID"`
 }
 
 type Server struct {
@@ -121,6 +122,7 @@ func main() {
 	http.HandleFunc("/api/delete_channel", authMiddle(deleteChannelHandler))
 	http.HandleFunc("/api/create_invite", authMiddle(createInviteHandler))
 	http.HandleFunc("/api/delete_invite", authMiddle(deleteInviteHandler))
+	http.HandleFunc("/api/list_invite", authMiddle(listMyInviteHandler))
 
 	log.Printf("Server has started on http://127.0.0.1:%d\n", settings.Http.Port)
 	http.ListenAndServe(fmt.Sprintf(":%d", settings.Http.Port), nil)
