@@ -157,7 +157,7 @@ func modifyUserHandler(w http.ResponseWriter, r *http.Request) {
 	var user User
 	if err := db.Where("id = ?", r.Context().Value("user_id")).First(&user).Error; err != nil {
 		w.WriteHeader(http.StatusNotFound)
-		json.NewEncoder(w).Encode(map[string]string{"error": "ユーザーが存在しません"})
+		json.NewEncoder(w).Encode(map[string]string{"error": "存在しないユーザーからのリクエストです"})
 		return
 	}
 
@@ -222,7 +222,7 @@ func changePasswordHandler(w http.ResponseWriter, r *http.Request) {
 	var user User
 	if err := db.Where("id = ?", r.Context().Value("user_id")).First(&user).Error; err != nil {
 		w.WriteHeader(http.StatusNotFound)
-		json.NewEncoder(w).Encode(map[string]string{"error": "ユーザーが存在しません"})
+		json.NewEncoder(w).Encode(map[string]string{"error": "存在しないユーザーからのリクエストです"})
 		return
 	}
 
@@ -277,7 +277,7 @@ func deleteUserHandler(w http.ResponseWriter, r *http.Request) {
 	var user User
 	if err := db.Where("id = ?", r.Context().Value("user_id")).First(&user).Error; err != nil {
 		w.WriteHeader(http.StatusNotFound)
-		json.NewEncoder(w).Encode(map[string]string{"error": "ユーザーが存在しません"})
+		json.NewEncoder(w).Encode(map[string]string{"error": "存在しないユーザーからのリクエストです"})
 		return
 	}
 
@@ -371,7 +371,7 @@ func modifyServerHandler(w http.ResponseWriter, r *http.Request) {
 	var user User
 	if err := db.Where("id = ?", r.Context().Value("user_id")).First(&user).Error; err != nil {
 		w.WriteHeader(http.StatusNotFound)
-		json.NewEncoder(w).Encode(map[string]string{"error": "ユーザーが存在しません"})
+		json.NewEncoder(w).Encode(map[string]string{"error": "存在しないユーザーからのリクエストです"})
 		return
 	}
 
@@ -433,7 +433,7 @@ func deleteServerHandler(w http.ResponseWriter, r *http.Request) {
 	var user User
 	if err := db.Where("id = ?", r.Context().Value("user_id")).First(&user).Error; err != nil {
 		w.WriteHeader(http.StatusNotFound)
-		json.NewEncoder(w).Encode(map[string]string{"error": "ユーザーが存在しません"})
+		json.NewEncoder(w).Encode(map[string]string{"error": "存在しないユーザーからのリクエストです"})
 		return
 	}
 
@@ -471,9 +471,31 @@ func deleteServerHandler(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-type JoinServerRequest struct{}
+type JoinServerRequest struct {
+	InviteCode string
+}
 
-func joinServerHandler(w http.ResponseWriter, r *http.Request) {}
+func joinServerHandler(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	var req JoinServerRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(map[string]string{"error": "不正なデータ形式です"})
+		return
+	}
+	var user User
+	if err := db.Where("id = ?", r.Context().Value("user_id")).First(&user).Error; err != nil {
+		w.WriteHeader(http.StatusNotFound)
+		json.NewEncoder(w).Encode(map[string]string{"error": "存在しないユーザーからのリクエストです"})
+		return
+	}
+	var invite Invite
+	if err := db.Where("code = ?", req.InviteCode).First(&invite).Error; err != nil {
+		w.WriteHeader(http.StatusNotFound)
+		json.NewEncoder(w).Encode(map[string]string{"error": "招待コードが存在しません"})
+		return
+	}
+}
 
 type LeaveServerRequest struct{}
 
@@ -525,7 +547,7 @@ func createInviteHandler(w http.ResponseWriter, r *http.Request) {
 	var user User
 	if err := db.Where("id = ?", r.Context().Value("user_id")).First(&user).Error; err != nil {
 		w.WriteHeader(http.StatusNotFound)
-		json.NewEncoder(w).Encode(map[string]string{"error": "ユーザーが存在しません"})
+		json.NewEncoder(w).Encode(map[string]string{"error": "存在しないユーザーからのリクエストです"})
 		return
 	}
 
@@ -599,7 +621,7 @@ func deleteInviteHandler(w http.ResponseWriter, r *http.Request) {
 	var user User
 	if err := db.Where("id = ?", r.Context().Value("user_id")).First(&user).Error; err != nil {
 		w.WriteHeader(http.StatusNotFound)
-		json.NewEncoder(w).Encode(map[string]string{"error": "ユーザーが存在しません"})
+		json.NewEncoder(w).Encode(map[string]string{"error": "存在しないユーザーからのリクエストです"})
 		return
 	}
 
